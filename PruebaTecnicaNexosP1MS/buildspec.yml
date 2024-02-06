@@ -1,0 +1,32 @@
+version: 0.2
+phases: 
+  pre_build: 
+    commands: 
+    - echo Logging in to Amazon ECR.... 
+    - aws --version
+    - $(aws ecr get-login --no-include-email --region us-east-1)
+    - echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7
+    - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+    - echo ${COMMIT_HASH:=latest}
+    - IMAGE_TAG=latest
+    - APPLICATION_NAME=jvqueryexpert
+    - echo $APPLICATION_NAME
+    - REPOSITORY_URI=223397806318.dkr.ecr.us-east-1.amazonaws.com/$APPLICATION_NAME
+    - echo $REPOSITORY_URI
+  build: 
+    commands:
+    - mvn clean package 
+    - echo Build started on `date` 
+    - echo Building the Docker image...
+    - docker build . -t $APPLICATION_NAME
+    - docker tag $APPLICATION_NAME:$IMAGE_TAG $REPOSITORY_URI:$IMAGE_TAG 
+  post_build: 
+    commands: 
+    - echo Build completed on `date` 
+    - echo pushing to repo
+    - docker push $REPOSITORY_URI:$IMAGE_TAG
+    - echo Writing image definitions file... 
+    - printf '[{"name":"SpringBootAppContainer", "imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+artifacts:
+  files:
+    - imagedefinitions.json
